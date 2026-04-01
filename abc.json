@@ -1,0 +1,4 @@
+{
+  "type": "multi-packages",
+  "builder": "@ali/builder-multi-packages"
+}

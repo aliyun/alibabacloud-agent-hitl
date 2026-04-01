@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.qoder
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temp files
+*.tmp
+*.temp
+.cache/
+
+# Environment files
+.env
+.env.local
+*.local
+
+# Package tarballs
+*.tgz
+
+# npm lock file (use pnpm-lock.yaml instead)
+package-lock.json
+
+# Plugin specific
+openclaw/
+dingtalk-connector

@@ -1,0 +1,19 @@
+{
+  "name": "@alicloud/alibabacloud-agent-hitl",
+  "version": "0.0.1",
+  "description": "Monorepo for OpenClaw plugins",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r dev",
+    "test": "pnpm -r test",
+    "clean": "pnpm -r exec rm -rf dist node_modules",
+    "pack": "pnpm --filter './packages/*' pack"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

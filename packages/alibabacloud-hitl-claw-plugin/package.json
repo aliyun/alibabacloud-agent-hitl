@@ -1,0 +1,69 @@
+{
+  "name": "@alicloud/alibabacloud-hitl-claw-plugin",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "OpenClaw plugin for intercepting tool calls with user confirmation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "config.json"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"const pkg=require('./package.json');const plugin=require('./openclaw.plugin.json');plugin.version=pkg.version;require('fs').writeFileSync('./openclaw.plugin.json',JSON.stringify(plugin,null,2))\"",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "alibabacloud-hitl-claw-plugin",
+    "security",
+    "confirmation"
+  ],
+  "author": "Alibaba Cloud",
+  "license": "MIT",
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "hooks": [
+      "before_tool_call"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24",
+      "minGatewayVersion": "2026.3.24"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24",
+      "pluginSdkVersion": "2026.3.24"
+    }
+  },
+  "dependencies": {
+    "nanoid": "^5.1.7",
+    "shell-quote": "^1.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/shell-quote": "^1.7.5",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.2"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

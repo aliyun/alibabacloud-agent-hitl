@@ -1,0 +1,6 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/alibabacloud-hitl-claw-plugin" }
+  ]
+}
