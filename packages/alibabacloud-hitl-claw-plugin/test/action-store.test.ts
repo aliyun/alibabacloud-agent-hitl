@@ -1,6 +1,6 @@
 /**
- * action-store.ts 测试
- * 测试 ActionStore 类的存储、查询、过期、清理功能
+ * action-store.ts tests
+ * Tests for ActionStore class storage, query, expiration, and cleanup functionality
  */
 
 import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
@@ -14,10 +14,10 @@ function createMockAction(overrides: Partial<PendingAction> = {}): PendingAction
     command: 'aliyun ecs DescribeInstances',
     params: {},
     createdAtMs: Date.now(),
-    expiresAtMs: Date.now() + 300_000, // 5 分钟后过期
+    expiresAtMs: Date.now() + 300_000, // expires in 5 minutes
     sessionKey: 'agent:main:main',
     riskLevel: 'MEDIUM',
-    message: '请确认是否执行',
+    message: 'Please confirm execution',
     ...overrides,
   };
 }
@@ -35,19 +35,19 @@ describe('ActionStore', () => {
   });
 
   describe('generateId', () => {
-    it('生成 8 字符的唯一 ID', () => {
+    it('generates 8-character unique ID', () => {
       const id = store.generateId();
       expect(id).toHaveLength(8);
     });
 
-    it('每次生成不同的 ID', () => {
+    it('generates different IDs each time', () => {
       const ids = new Set([store.generateId(), store.generateId(), store.generateId()]);
       expect(ids.size).toBe(3);
     });
   });
 
   describe('store & get', () => {
-    it('存储并获取 action', () => {
+    it('stores and retrieves action', () => {
       const action = createMockAction({ id: 'action-1' });
       store.store(action);
       
@@ -55,14 +55,14 @@ describe('ActionStore', () => {
       expect(retrieved).toEqual(action);
     });
 
-    it('获取不存在的 action 返回 undefined', () => {
+    it('returns undefined for non-existent action', () => {
       expect(store.get('non-existent')).toBeUndefined();
     });
 
-    it('获取已过期的 action 返回 undefined', () => {
+    it('returns undefined for expired action', () => {
       const action = createMockAction({
         id: 'expired-action',
-        expiresAtMs: Date.now() - 1000, // 已过期
+        expiresAtMs: Date.now() - 1000, // already expired
       });
       store.store(action);
 
@@ -71,7 +71,7 @@ describe('ActionStore', () => {
   });
 
   describe('delete', () => {
-    it('删除存在的 action 返回 true', () => {
+    it('returns true when deleting existing action', () => {
       const action = createMockAction({ id: 'to-delete' });
       store.store(action);
       
@@ -79,13 +79,13 @@ describe('ActionStore', () => {
       expect(store.get('to-delete')).toBeUndefined();
     });
 
-    it('删除不存在的 action 返回 false', () => {
+    it('returns false when deleting non-existent action', () => {
       expect(store.delete('non-existent')).toBe(false);
     });
   });
 
   describe('listPending', () => {
-    it('列出所有未过期的 action', () => {
+    it('lists all non-expired actions', () => {
       store.store(createMockAction({ id: 'action-1', createdAtMs: 1000 }));
       store.store(createMockAction({ id: 'action-2', createdAtMs: 2000 }));
       
@@ -93,7 +93,7 @@ describe('ActionStore', () => {
       expect(list).toHaveLength(2);
     });
 
-    it('按创建时间降序排列', () => {
+    it('sorts by creation time descending', () => {
       store.store(createMockAction({ id: 'older', createdAtMs: 1000 }));
       store.store(createMockAction({ id: 'newer', createdAtMs: 2000 }));
       
@@ -102,7 +102,7 @@ describe('ActionStore', () => {
       expect(list[1].id).toBe('older');
     });
 
-    it('自动过滤已过期的 action', () => {
+    it('auto-filters expired actions', () => {
       store.store(createMockAction({ id: 'valid' }));
       store.store(createMockAction({ id: 'expired', expiresAtMs: Date.now() - 1000 }));
       
@@ -113,7 +113,7 @@ describe('ActionStore', () => {
   });
 
   describe('listBySession', () => {
-    it('按 sessionKey 筛选 action', () => {
+    it('filters actions by sessionKey', () => {
       store.store(createMockAction({ id: 'session1-a', sessionKey: 'session-1' }));
       store.store(createMockAction({ id: 'session1-b', sessionKey: 'session-1' }));
       store.store(createMockAction({ id: 'session2-a', sessionKey: 'session-2' }));
@@ -123,7 +123,7 @@ describe('ActionStore', () => {
       expect(list.every(a => a.sessionKey === 'session-1')).toBe(true);
     });
 
-    it('按创建时间升序排列', () => {
+    it('sorts by creation time ascending', () => {
       store.store(createMockAction({ id: 'newer', sessionKey: 's1', createdAtMs: 2000 }));
       store.store(createMockAction({ id: 'older', sessionKey: 's1', createdAtMs: 1000 }));
       
@@ -134,7 +134,7 @@ describe('ActionStore', () => {
   });
 
   describe('takeBySession', () => {
-    it('获取并删除指定 session 的所有 action', () => {
+    it('gets and deletes all actions for specified session', () => {
       store.store(createMockAction({ id: 'action-1', sessionKey: 'target' }));
       store.store(createMockAction({ id: 'action-2', sessionKey: 'target' }));
       store.store(createMockAction({ id: 'action-3', sessionKey: 'other' }));
@@ -142,15 +142,15 @@ describe('ActionStore', () => {
       const taken = store.takeBySession('target');
       expect(taken).toHaveLength(2);
       
-      // 确认已被删除
+      // Confirm deleted
       expect(store.listBySession('target')).toHaveLength(0);
-      // 其他 session 的不受影响
+      // Other session unaffected
       expect(store.listBySession('other')).toHaveLength(1);
     });
   });
 
   describe('deleteBySession', () => {
-    it('删除指定 session 的所有 action 并返回数量', () => {
+    it('deletes all actions for specified session and returns count', () => {
       store.store(createMockAction({ id: 'a1', sessionKey: 'target' }));
       store.store(createMockAction({ id: 'a2', sessionKey: 'target' }));
       store.store(createMockAction({ id: 'a3', sessionKey: 'other' }));
@@ -162,7 +162,7 @@ describe('ActionStore', () => {
   });
 
   describe('cleanup', () => {
-    it('清理所有过期的 action', () => {
+    it('cleans up all expired actions', () => {
       store.store(createMockAction({ id: 'valid', expiresAtMs: Date.now() + 10000 }));
       store.store(createMockAction({ id: 'expired1', expiresAtMs: Date.now() - 1000 }));
       store.store(createMockAction({ id: 'expired2', expiresAtMs: Date.now() - 2000 }));
@@ -175,7 +175,7 @@ describe('ActionStore', () => {
   });
 
   describe('destroy', () => {
-    it('清空所有数据', () => {
+    it('clears all data', () => {
       store.store(createMockAction({ id: 'a1' }));
       store.store(createMockAction({ id: 'a2' }));
       
@@ -191,13 +191,13 @@ describe('Global ActionStore', () => {
     destroyActionStore();
   });
 
-  it('getActionStore 返回单例', () => {
+  it('getActionStore returns singleton', () => {
     const store1 = getActionStore();
     const store2 = getActionStore();
     expect(store1).toBe(store2);
   });
 
-  it('destroyActionStore 销毁单例', () => {
+  it('destroyActionStore destroys singleton', () => {
     const store1 = getActionStore();
     store1.store(createMockAction({ id: 'test' }));
     

@@ -1,13 +1,13 @@
 /**
  * OpenClaw Alibaba Cloud HITL Interceptor Plugin
  *
- * 拦截阿里云 CLI 命令，通过风控 API 检测敏感操作，实现人工审批流程。
+ * Intercepts Alibaba Cloud CLI commands, detects sensitive operations through risk control API, and implements human approval workflow.
  *
- * 流程：
- * 1. Agent 调用 exec 工具 → 插件拦截
- * 2. 调用风控 API 检测命令风险 → ALLOW/DENY/ESCALATE
- * 3. ESCALATE 时存储命令，启动审批轮询
- * 4. 用户审批通过 → 执行命令，通知 Agent 继续
+ * Workflow:
+ * 1. Agent calls exec tool → Plugin intercepts
+ * 2. Call risk control API to detect command risk → ALLOW/DENY/ESCALATE
+ * 3. On ESCALATE, store command and start approval polling
+ * 4. User approves → Execute command and notify Agent to continue
  */
 
 import type {
@@ -23,7 +23,7 @@ import { checkHitlRule, startPolling, clearPollingActions } from './hitl.js';
 import { isMainChannel, isDingtalkChannel } from './channel.js';
 
 // ============================================================================
-// 插件入口
+// Plugin Entry
 // ============================================================================
 
 export default function register(api: OpenClawPluginApi): void {
@@ -39,7 +39,7 @@ export default function register(api: OpenClawPluginApi): void {
   const store = getActionStore();
 
   // -------------------------------------------------------------------------
-  // 注册 before_tool_call 钩子（核心拦截逻辑）
+  // Register before_tool_call hook (core interception logic)
   // -------------------------------------------------------------------------
   api.on(
     'before_tool_call',
@@ -47,7 +47,7 @@ export default function register(api: OpenClawPluginApi): void {
       event: PluginHookBeforeToolCallEvent,
       ctx: PluginHookToolContext,
     ): Promise<PluginHookBeforeToolCallResult | void> => {
-      // 只拦截 exec 工具
+      // Only intercept exec tool
       if (event.toolName !== 'exec') {
         return;
       }
@@ -57,7 +57,7 @@ export default function register(api: OpenClawPluginApi): void {
         return;
       }
 
-      // 从命令中提取 aliyun CLI 命令
+      // Extract aliyun CLI commands from the command
       const aliyunCommands = extractAliyunCommands(command);
       if (aliyunCommands.length === 0) {
         return;
@@ -65,57 +65,57 @@ export default function register(api: OpenClawPluginApi): void {
 
       const aliyunCommandStr = joinAliyunCommands(aliyunCommands);
 
-      // 调用风控 API
+      // Call risk control API
       const sessionId = ctx.sessionKey || '';
       const agentId = ctx.agentId || (api.config as { agentId?: string })?.agentId || 'unknown';
 
       const hitlResult = await checkHitlRule(aliyunCommandStr, sessionId, agentId, api.logger);
       api.logger.info(`[hitl] Risk decision: ${hitlResult.decision}`);
 
-      // ALLOW: 放行
+      // ALLOW: pass through
       if (hitlResult.decision === 'ALLOW') {
         return;
       }
 
-      // DENY: 拒绝
+      // DENY: reject
       if (hitlResult.decision === 'DENY') {
         const isComposite = aliyunCommandStr !== command;
         return {
           block: true,
           blockReason: [
-            `⛔ **操作已被风控拒绝**`,
+            `⛔ **Operation Denied by Risk Control**`,
             '',
             ...(isComposite ? [
-              `⚠️ **注意：原始命令为复合命令，风控只检测阿里云 CLI 部分**`,
+              `⚠️ **Note: Original command is composite, only Alibaba Cloud CLI part was checked**`,
               '',
-              `**原始命令:**`,
+              `**Original Command:**`,
               '```',
               command,
               '```',
               '',
             ] : []),
-            `**被拒绝的阿里云命令:**`,
+            `**Denied Alibaba Cloud Command:**`,
             '```',
             aliyunCommandStr,
             '```',
             '',
-            `**拒绝原因:** ${hitlResult.reason || '未知'}`,
+            `**Denial Reason:** ${hitlResult.reason || 'Unknown'}`,
             '',
-            `请联系管理员或调整操作。`,
+            `Please contact administrator or adjust the operation.`,
           ].join('\n'),
         };
       }
 
-      // ESCALATE: 需要人工审批
+      // ESCALATE: requires human approval
       if (!hitlResult.approvalRequirements) {
         api.logger.error('[hitl] ESCALATE but no approvalRequirements');
         return {
           block: true,
           blockReason: [
-            `⚠️ **风控 API 异常**`,
+            `⚠️ **Risk Control API Error**`,
             '',
-            `风控系统返回了 ESCALATE 决策，但未提供审批链接。`,
-            `请稍后重试或联系管理员。`,
+            `The risk control system returned ESCALATE decision but did not provide approval link.`,
+            `Please retry later or contact administrator.`,
           ].join('\n'),
         };
       }
@@ -126,12 +126,12 @@ export default function register(api: OpenClawPluginApi): void {
         confirmUrl: hitlResult.approvalRequirements.confirmUrl,
         approvalTimeout: hitlResult.approvalRequirements.approvalTimeout,
         riskLevel: hitlResult.riskLevel || 'Medium',
-        reason: hitlResult.reason || '需要人工确认',
+        reason: hitlResult.reason || 'Requires human confirmation',
       };
 
       const actionId = store.generateId();
 
-      // 存储 action（审批后执行完整原始命令）
+      // Store action (execute full original command after approval)
       store.store({
         id: actionId,
         toolName: event.toolName,
@@ -146,67 +146,67 @@ export default function register(api: OpenClawPluginApi): void {
         hitl: hitlInfo,
       });
 
-      // 启动后台轮询
+      // Start background polling
       const storedAction = store.get(actionId);
       if (storedAction) {
         startPolling(storedAction, api);
       }
 
-      // 返回拦截信息
+      // Return interception info
       const timeoutMin = Math.floor(hitlInfo.approvalTimeout / 60);
       const isMain = isMainChannel(ctx.sessionKey);
       const isDingtalk = isDingtalkChannel(ctx.sessionKey);
       const isComposite = aliyunCommandStr !== command;
 
-      // 根据渠道类型生成不同格式的审批链接
+      // Generate approval link based on channel type
       let approvalLink: string;
       if (isMain) {
-        // 主渠道和飞书渠道：直接使用原始链接
-        approvalLink = `👉 [点击此处完成审批](${hitlInfo.confirmUrl})`;
+        // Main channel and Feishu channel: use original link directly
+        approvalLink = `👉 [Click here to complete approval](${hitlInfo.confirmUrl})`;
       } else if (isDingtalk) {
-        // 钉钉渠道：使用钉钉深链接
-        approvalLink = `👉 [点击此处完成审批](dingtalk://dingtalkclient/page/link?url=${encodeURIComponent(hitlInfo.confirmUrl)}&pc_slide=true)`;
+        // DingTalk channel: use DingTalk deep link
+        approvalLink = `👉 [Click here to complete approval](dingtalk://dingtalkclient/page/link?url=${encodeURIComponent(hitlInfo.confirmUrl)}&pc_slide=true)`;
       } else {
-        // 其他渠道：使用原始链接
-        approvalLink = `👉 [点击此处完成审批](${hitlInfo.confirmUrl})`;
+        // Other channels: use original link
+        approvalLink = `👉 [Click here to complete approval](${hitlInfo.confirmUrl})`;
       }
 
       return {
         block: true,
         blockReason: [
-          `⚠️ **此操作需要人工审批** [${hitlInfo.riskLevel.toUpperCase()}]`,
+          `⚠️ **This operation requires human approval** [${hitlInfo.riskLevel.toUpperCase()}]`,
           '',
           ...(isComposite ? [
-            `📝 **注意：原始命令为复合命令，审批只针对阿里云 CLI 部分，审批通过后执行完整命令**`,
+            `📝 **Note: Original command is composite. Approval only applies to Alibaba Cloud CLI part. Full command will execute after approval.**`,
             '',
-            `**原始命令:**`,
+            `**Original Command:**`,
             '```',
             command,
             '```',
             '',
-            `**待审批的阿里云命令:**`,
+            `**Alibaba Cloud Command Pending Approval:**`,
             '```',
             aliyunCommandStr,
             '```',
           ] : [
-            `**待审批命令:**`,
+            `**Command Pending Approval:**`,
             '```',
             command,
             '```',
           ]),
           '',
-          `**风险原因:** ${hitlInfo.reason}`,
+          `**Risk Reason:** ${hitlInfo.reason}`,
           '',
-          `**请点击以下链接完成审批:**`,
+          `**Please click the link below to complete approval:**`,
           approvalLink,
           '',
-          `✅ 审批通过后，命令将自动执行。`,
-          `❌ 审批拒绝后，命令将被取消。`,
+          `✅ After approval, the command will execute automatically.`,
+          `❌ After rejection, the command will be cancelled.`,
           '',
-          `⏱️ 审批超时时间: ${timeoutMin} 分钟`,
+          `⏱️ Approval timeout: ${timeoutMin} minutes`,
           '',
           `---`,
-          `**重要：请只展示以上审批信息，然后停止。不要预测、描述或假设命令执行后的结果。等待用户审批。**`,
+          `**Important: Please only display the above approval information, then stop. Do not predict, describe, or assume command execution results. Wait for user approval.**`,
         ].join('\n'),
       };
     },

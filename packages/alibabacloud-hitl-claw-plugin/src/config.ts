@@ -1,5 +1,5 @@
 /**
- * 配置加载模块
+ * Configuration Loading Module
  */
 
 import { readFileSync } from 'fs';
@@ -7,7 +7,7 @@ import { join } from 'path';
 import type { PluginConfig, Logger } from './types.js';
 
 /**
- * 默认配置
+ * Default configuration
  */
 const DEFAULT_CONFIG: PluginConfig = {
   enabled: true,
@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: PluginConfig = {
 };
 
 /**
- * 从文件加载配置
+ * Load configuration from file
  */
 export function loadConfig(logger: Logger): PluginConfig {
   try {

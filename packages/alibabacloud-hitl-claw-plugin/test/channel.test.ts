@@ -1,103 +1,57 @@
 /**
- * channel.ts 测试
- * 测试 conversationId 缓存和渠道解析功能
+ * channel.ts tests
+ * Tests for channel parsing functionality
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  cacheOriginalConversationId,
-  getOriginalConversationId,
-  clearConversationIdCache,
   isMainChannel,
   isDingtalkChannel,
   parseChannelFromSessionKey,
 } from '../src/channel.js';
 
-describe('conversationId 缓存', () => {
-  beforeEach(() => {
-    clearConversationIdCache();
-  });
-
-  it('缓存混合大小写的 conversationId', () => {
-    cacheOriginalConversationId('Cid9Ny3Fb+D+1LksF2sn7gjEQ==');
-    expect(getOriginalConversationId('cid9ny3fb+d+1lksf2sn7gjeq==')).toBe('Cid9Ny3Fb+D+1LksF2sn7gjEQ==');
-  });
-
-  it('全小写的 conversationId 不会被缓存', () => {
-    cacheOriginalConversationId('alllowercase');
-    expect(getOriginalConversationId('alllowercase')).toBe('alllowercase');
-  });
-
-  it('缓存未命中时返回原值', () => {
-    expect(getOriginalConversationId('unknown-id')).toBe('unknown-id');
-  });
-
-  it('不缓存空值', () => {
-    cacheOriginalConversationId(undefined);
-    cacheOriginalConversationId('');
-    expect(getOriginalConversationId('')).toBe('');
-  });
-
-  it('clearConversationIdCache 清空缓存', () => {
-    cacheOriginalConversationId('Cid9Ny3Fb+D+1LksF2sn7gjEQ==');
-    clearConversationIdCache();
-    expect(getOriginalConversationId('cid9ny3fb+d+1lksf2sn7gjeq==')).toBe('cid9ny3fb+d+1lksf2sn7gjeq==');
-  });
-
-  it('缓存有上限（LRU 淘汰）', () => {
-    // 填充缓存到接近上限
-    for (let i = 0; i < 1001; i++) {
-      cacheOriginalConversationId(`CacheTest${i}ID`);
-    }
-    // 第一个应该被淘汰
-    expect(getOriginalConversationId('cachetest0id')).toBe('cachetest0id');
-    // 最后一个应该还在
-    expect(getOriginalConversationId('cachetest1000id')).toBe('CacheTest1000ID');
-  });
-});
-
 describe('isMainChannel', () => {
-  it('识别主渠道', () => {
+  it('identifies main channel', () => {
     expect(isMainChannel('agent:main:main')).toBe(true);
     expect(isMainChannel('something:main')).toBe(true);
   });
 
-  it('识别非主渠道', () => {
+  it('identifies non-main channel', () => {
     expect(isMainChannel('agent:main:dingtalk:group:cid123')).toBe(false);
     expect(isMainChannel('agent:main:feishu:group:xxx')).toBe(false);
   });
 
-  it('处理 undefined', () => {
+  it('handles undefined', () => {
     expect(isMainChannel(undefined)).toBe(false);
   });
 });
 
 describe('isDingtalkChannel', () => {
-  it('识别钉钉渠道', () => {
+  it('identifies DingTalk channel', () => {
     expect(isDingtalkChannel('agent:main:dingtalk:group:cid123')).toBe(true);
     expect(isDingtalkChannel('agent:main:dingtalk-connector:group:cid123')).toBe(true);
   });
 
-  it('识别非钉钉渠道', () => {
+  it('identifies non-DingTalk channel', () => {
     expect(isDingtalkChannel('agent:main:feishu:group:xxx')).toBe(false);
     expect(isDingtalkChannel('agent:main:main')).toBe(false);
   });
 
-  it('处理 undefined', () => {
+  it('handles undefined', () => {
     expect(isDingtalkChannel(undefined)).toBe(false);
   });
 });
 
 describe('parseChannelFromSessionKey', () => {
-  describe('主渠道', () => {
-    it('解析主渠道', () => {
+  describe('main channel', () => {
+    it('parses main channel', () => {
       const result = parseChannelFromSessionKey('agent:main:main');
       expect(result).toEqual({ channel: 'main', type: 'unknown', target: '' });
     });
   });
 
-  describe('钉钉渠道', () => {
-    it('解析钉钉群聊（dingtalk-connector）', () => {
+  describe('DingTalk channel', () => {
+    it('parses DingTalk group (dingtalk-connector)', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk-connector:group:cid9ny3fb+d+1lksf2sn7gjeq==');
       expect(result).toEqual({
         channel: 'dingtalk',
@@ -108,7 +62,7 @@ describe('parseChannelFromSessionKey', () => {
       });
     });
 
-    it('解析钉钉单聊（direct -> user）', () => {
+    it('parses DingTalk DM (direct -> user)', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk-connector:direct:user123');
       expect(result).toEqual({
         channel: 'dingtalk',
@@ -119,7 +73,7 @@ describe('parseChannelFromSessionKey', () => {
       });
     });
 
-    it('解析钉钉旧格式（dingtalk）', () => {
+    it('parses DingTalk legacy format (dingtalk)', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk:group:cidXXX');
       expect(result).toEqual({
         channel: 'dingtalk',
@@ -130,7 +84,7 @@ describe('parseChannelFromSessionKey', () => {
       });
     });
 
-    it('解析带 accountId 的钉钉渠道', () => {
+    it('parses DingTalk channel with accountId', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk-connector:account1:group:cidXXX');
       expect(result).toEqual({
         channel: 'dingtalk',
@@ -142,8 +96,8 @@ describe('parseChannelFromSessionKey', () => {
     });
   });
 
-  describe('飞书渠道', () => {
-    it('解析飞书群聊', () => {
+  describe('Feishu channel', () => {
+    it('parses Feishu group', () => {
       const result = parseChannelFromSessionKey('agent:main:feishu:group:oc_xxx123');
       expect(result).toEqual({
         channel: 'feishu',
@@ -154,7 +108,7 @@ describe('parseChannelFromSessionKey', () => {
       });
     });
 
-    it('解析 feishu-connector', () => {
+    it('parses feishu-connector', () => {
       const result = parseChannelFromSessionKey('agent:main:feishu-connector:group:oc_xxx');
       expect(result).toEqual({
         channel: 'feishu',
@@ -166,28 +120,34 @@ describe('parseChannelFromSessionKey', () => {
     });
   });
 
-  describe('边界情况', () => {
-    it('处理 undefined', () => {
+  describe('edge cases', () => {
+    it('handles undefined', () => {
       const result = parseChannelFromSessionKey(undefined);
       expect(result).toEqual({ channel: 'unknown', type: 'unknown', target: '' });
     });
 
-    it('处理空字符串', () => {
+    it('handles empty string', () => {
       const result = parseChannelFromSessionKey('');
       expect(result).toEqual({ channel: 'unknown', type: 'unknown', target: '' });
     });
 
-    it('处理未知渠道', () => {
+    it('handles unknown channel (still parses for routing)', () => {
       const result = parseChannelFromSessionKey('agent:main:unknown:group:xxx');
-      expect(result).toEqual({ channel: 'unknown', type: 'unknown', target: '' });
+      expect(result).toEqual({
+        channel: 'unknown',
+        type: 'group',
+        target: 'xxx',
+        accountId: undefined,
+        rawChannelName: 'unknown',  // Preserved for routing back
+      });
     });
 
-    it('处理不完整的 sessionKey', () => {
+    it('handles incomplete sessionKey', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk');
       expect(result).toEqual({ channel: 'unknown', type: 'unknown', target: '' });
     });
 
-    it('处理带冒号的 target', () => {
+    it('handles target with colons', () => {
       const result = parseChannelFromSessionKey('agent:main:dingtalk-connector:group:cid:with:colons');
       expect(result).toEqual({
         channel: 'dingtalk',

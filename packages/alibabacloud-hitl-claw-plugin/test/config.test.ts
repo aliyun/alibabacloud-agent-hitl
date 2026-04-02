@@ -1,6 +1,6 @@
 /**
- * config.ts 测试
- * 测试配置加载功能
+ * config.ts tests
+ * Tests for configuration loading functionality
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -29,7 +29,7 @@ describe('loadConfig', () => {
     vi.clearAllMocks();
   });
 
-  it('从配置文件加载完整配置', () => {
+  it('loads complete config from file', () => {
     mockReadFileSync.mockReturnValue(JSON.stringify({
       enabled: false,
       confirmationTimeoutSeconds: 600,
@@ -42,7 +42,7 @@ describe('loadConfig', () => {
     expect(config.confirmationTimeoutSeconds).toBe(600);
   });
 
-  it('配置文件部分字段时使用默认值补全', () => {
+  it('uses defaults to fill partial config', () => {
     mockReadFileSync.mockReturnValue(JSON.stringify({
       enabled: false,
     }));
@@ -51,10 +51,10 @@ describe('loadConfig', () => {
     const config = loadConfig(logger);
 
     expect(config.enabled).toBe(false);
-    expect(config.confirmationTimeoutSeconds).toBe(300); // 默认值
+    expect(config.confirmationTimeoutSeconds).toBe(300); // default value
   });
 
-  it('配置文件不存在时使用默认配置', () => {
+  it('uses default config when file not found', () => {
     mockReadFileSync.mockImplementation(() => {
       throw new Error('ENOENT: no such file or directory');
     });
@@ -67,7 +67,7 @@ describe('loadConfig', () => {
     expect(logger.debug).toHaveBeenCalledWith(expect.stringContaining('config.json not found'));
   });
 
-  it('配置文件 JSON 格式错误时使用默认配置', () => {
+  it('uses default config when JSON format is invalid', () => {
     mockReadFileSync.mockReturnValue('invalid json {{{');
 
     const logger = createMockLogger();
@@ -77,7 +77,7 @@ describe('loadConfig', () => {
     expect(config.confirmationTimeoutSeconds).toBe(300);
   });
 
-  it('空配置文件时使用默认配置', () => {
+  it('uses default config for empty config file', () => {
     mockReadFileSync.mockReturnValue('{}');
 
     const logger = createMockLogger();

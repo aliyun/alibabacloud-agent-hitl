@@ -1,71 +1,71 @@
 /**
- * 格式化工具函数
+ * Formatting utility functions
  */
 
 import type { PendingAction } from './types.js';
 
 /**
- * 格式化审批超时消息
+ * Format approval timeout message
  */
 export function formatTimeoutMessage(action: PendingAction, timeoutSec: number): string {
   const timeoutMinDisplay = Math.floor(timeoutSec / 60);
   return [
-    `[HITL-plugin] 审批超时通知：以下命令因超时未审批已自动取消，请勿重试或总结，直接告知用户超时情况。`,
+    `[HITL-plugin] Approval timeout notification: The following command was auto-cancelled due to timeout. Do not retry or summarize, just inform the user about the timeout.`,
     '',
-    `⚠️ **审批超时，命令已自动取消**`,
+    `⚠️ **Approval Timeout - Command Cancelled**`,
     '',
-    `**操作ID:** \`${action.id}\``,
-    `**风险等级:** ${action.hitl?.riskLevel || action.riskLevel || 'MEDIUM'}`,
-    `**超时时间:** ${timeoutMinDisplay} 分钟`,
+    `**Action ID:** \`${action.id}\``,
+    `**Risk Level:** ${action.hitl?.riskLevel || action.riskLevel || 'MEDIUM'}`,
+    `**Timeout:** ${timeoutMinDisplay} minutes`,
     '',
-    `**已取消的命令:**`,
+    `**Cancelled Command:**`,
     '```',
     action.command,
     '```',
     '',
-    `请总结后告知用户。`,
+    `Please summarize and inform the user.`,
   ].join('\n');
 }
 
 /**
- * 格式化审批通过后的 Agent 消息
+ * Format approval success message for Agent
  */
 export function formatApprovalSuccessMessage(command: string, result: string): string {
   return [
-    `用户已通过风控审批并执行了之前被拦截的命令，以下是执行结果:`,
+    `The user has approved the risk control check and executed the previously blocked command. Here is the result:`,
     '',
     `$ ${command}`,
     '',
     result,
     '',
-    `请根据以上执行结果，继续完成后续任务。如果命令执行失败了，请询问用户是否需要重试，不要自己重试。`,
+    `Please continue with subsequent tasks based on the execution result above. If the command failed, ask the user if they want to retry. Do not retry automatically.`,
   ].join('\n');
 }
 
 /**
- * 格式化审批拒绝后的 Agent 消息
+ * Format approval rejected message for Agent
  */
 export function formatApprovalRejectedMessage(command: string): string {
   return [
-    `用户已拒绝风控审批，以下命令不会执行:`,
+    `The user has rejected the risk control approval. The following command will not be executed:`,
     '',
     `$ ${command}`,
     '',
-    `请询问用户是否需要其他操作。`,
+    `Please ask the user if they need any other operations.`,
   ].join('\n');
 }
 
 /**
- * 格式化 Token 校验失败后的 Agent 消息
+ * Format token validation failed message for Agent
  */
 export function formatTokenValidationFailedMessage(command: string, reason: string): string {
   return [
-    `审批校验失败，以下命令无法执行:`,
+    `Approval validation failed. The following command cannot be executed:`,
     '',
     `$ ${command}`,
     '',
-    `**失败原因:** ${reason}`,
+    `**Failure Reason:** ${reason}`,
     '',
-    `请告知用户审批校验失败，如有需要可重新发起审批。`,
+    `Please inform the user that the approval validation failed. They may re-initiate the approval if needed.`,
   ].join('\n');
 }

@@ -1,5 +1,5 @@
 /**
- * 命令执行工具
+ * Command Execution Utility
  */
 
 import { exec } from 'child_process';
@@ -17,22 +17,22 @@ export async function execCommand(command: string): Promise<string> {
       maxBuffer: 1024 * 1024, // 1MB
     });
     const output = (stdout || '') + (stderr ? `\n[stderr]\n${stderr}` : '');
-    return output.trim() || '(无输出)';
+    return output.trim() || '(no output)';
   } catch (err: unknown) {
     const error = err as { code?: number; killed?: boolean; message?: string; stdout?: string; stderr?: string };
     if (error.killed) {
-      return '执行超时 (60秒)';
+      return 'Execution timeout (60s)';
     }
     const output = (error.stdout || '') + (error.stderr || '');
-    return `执行失败 (exit code: ${error.code ?? 'unknown'}):\n${output || error.message || String(err)}`;
+    return `Execution failed (exit code: ${error.code ?? 'unknown'}):\n${output || error.message || String(err)}`;
   }
 }
 
-/** 缓存 CLI 版本 */
+/** Cache CLI version */
 let cachedCliVersion: string | null = null;
 
 /**
- * 获取 aliyun CLI 版本（缓存）
+ * Get aliyun CLI version (cached)
  */
 export async function getCliVersion(): Promise<string> {
   if (cachedCliVersion) {
@@ -40,7 +40,7 @@ export async function getCliVersion(): Promise<string> {
   }
   try {
     const result = await execCommand('aliyun --version');
-    // 从 "阿里云CLI命令行工具 3.0.298" 中提取版本号
+    // Extract version number from "Alibaba Cloud CLI 3.0.298"
     const match = result.match(/(\d+\.\d+\.\d+)/);
     cachedCliVersion = match ? match[1] : 'unknown';
     return cachedCliVersion;

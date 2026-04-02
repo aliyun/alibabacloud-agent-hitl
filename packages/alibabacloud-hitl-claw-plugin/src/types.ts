@@ -18,12 +18,12 @@ export interface PluginConfig {
 // ============================================================================
 
 export interface HitlInfo {
-  authReqId: string;       // 审批请求 ID
-  pollingUrl: string;      // 轮询 URL
-  confirmUrl: string;      // 用户确认链接
-  approvalTimeout: number; // 超时时间（秒）
-  riskLevel: string;       // 风控返回的风险等级
-  reason: string;          // 风控返回的原因
+  authReqId: string;       // Approval request ID
+  pollingUrl: string;      // Polling URL
+  confirmUrl: string;      // User confirmation link
+  approvalTimeout: number; // Timeout in seconds
+  riskLevel: string;       // Risk level returned by risk control
+  reason: string;          // Reason returned by risk control
 }
 
 export interface PendingAction {
@@ -47,9 +47,9 @@ export interface PendingAction {
 export interface ChannelInfo {
   channel: 'dingtalk' | 'feishu' | 'main' | 'unknown';
   type: 'group' | 'user' | 'unknown';
-  target: string;  // conversationId 或 userId
+  target: string;  // conversationId or userId
   accountId?: string;
-  rawChannelName?: string;  // 原始渠道名称，如 'dingtalk-connector'
+  rawChannelName?: string;  // Original channel name, e.g., 'dingtalk-connector'
 }
 
 // ============================================================================
@@ -76,7 +76,7 @@ export type PollStatus = 'pending' | 'success' | 'failed' | 'unknown';
 export interface PollResult {
   status: PollStatus;
   hitlToken?: string;
-  delayMs?: number;  // 下次轮询的延迟时间（毫秒）
+  delayMs?: number;  // Delay time for next poll (milliseconds)
 }
 
 // ============================================================================

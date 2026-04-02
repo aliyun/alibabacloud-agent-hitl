@@ -1,6 +1,6 @@
 /**
- * format.ts 测试
- * 测试格式化函数
+ * format.ts tests
+ * Tests for formatting functions
  */
 
 import { describe, expect, it } from 'vitest';
@@ -21,20 +21,20 @@ describe('formatTimeoutMessage', () => {
     riskLevel: 'MEDIUM',
     createdAtMs: Date.now(),
     expiresAtMs: Date.now() + 300_000,
-    message: '请确认是否执行',
+    message: 'Please confirm execution',
   };
 
-  it('格式化超时消息', () => {
+  it('formats timeout message', () => {
     const result = formatTimeoutMessage(baseAction, 300);
     
-    expect(result).toContain('⚠️ **审批超时，命令已自动取消**');
+    expect(result).toContain('**Approval Timeout - Command Cancelled**');
     expect(result).toContain('`action-123`');
     expect(result).toContain('MEDIUM');
-    expect(result).toContain('5 分钟');
+    expect(result).toContain('5 minutes');
     expect(result).toContain('aliyun ecs DescribeInstances');
   });
 
-  it('使用 hitl.riskLevel 如果存在', () => {
+  it('uses hitl.riskLevel if exists', () => {
     const actionWithHitl: PendingAction = {
       ...baseAction,
       hitl: {
@@ -43,42 +43,42 @@ describe('formatTimeoutMessage', () => {
         confirmUrl: 'https://example.com/confirm',
         approvalTimeout: 300,
         riskLevel: 'HIGH',
-        reason: '高风险操作',
+        reason: 'High risk operation',
       },
     };
     const result = formatTimeoutMessage(actionWithHitl, 600);
     expect(result).toContain('HIGH');
-    expect(result).toContain('10 分钟');
+    expect(result).toContain('10 minutes');
   });
 
-  it('正确计算分钟数', () => {
-    expect(formatTimeoutMessage(baseAction, 60)).toContain('1 分钟');
-    expect(formatTimeoutMessage(baseAction, 120)).toContain('2 分钟');
-    expect(formatTimeoutMessage(baseAction, 90)).toContain('1 分钟'); // 向下取整
+  it('calculates minutes correctly', () => {
+    expect(formatTimeoutMessage(baseAction, 60)).toContain('1 minutes');
+    expect(formatTimeoutMessage(baseAction, 120)).toContain('2 minutes');
+    expect(formatTimeoutMessage(baseAction, 90)).toContain('1 minutes'); // floor
   });
 });
 
 describe('formatApprovalSuccessMessage', () => {
-  it('格式化审批成功消息', () => {
+  it('formats approval success message', () => {
     const result = formatApprovalSuccessMessage(
       'aliyun ecs DescribeInstances',
       '{"Instances": []}',
     );
     
-    expect(result).toContain('用户已通过风控审批并执行了之前被拦截的命令');
+    expect(result).toContain('The user has approved the risk control check');
     expect(result).toContain('$ aliyun ecs DescribeInstances');
     expect(result).toContain('{"Instances": []}');
-    expect(result).toContain('请根据以上执行结果，继续完成后续任务');
+    expect(result).toContain('Please continue with subsequent tasks');
   });
 
-  it('处理多行执行结果', () => {
+  it('handles multiline execution result', () => {
     const multilineResult = 'line1\nline2\nline3';
     const result = formatApprovalSuccessMessage('ls -la', multilineResult);
     
     expect(result).toContain('line1\nline2\nline3');
   });
 
-  it('处理空执行结果', () => {
+  it('handles empty execution result', () => {
     const result = formatApprovalSuccessMessage('echo', '');
     
     expect(result).toContain('$ echo');
@@ -86,12 +86,12 @@ describe('formatApprovalSuccessMessage', () => {
 });
 
 describe('formatApprovalRejectedMessage', () => {
-  it('格式化审批拒绝消息', () => {
+  it('formats approval rejected message', () => {
     const result = formatApprovalRejectedMessage('aliyun ecs DeleteInstance --InstanceId xxx');
     
-    expect(result).toContain('用户已拒绝风控审批');
-    expect(result).toContain('不会执行');
+    expect(result).toContain('The user has rejected the risk control approval');
+    expect(result).toContain('will not be executed');
     expect(result).toContain('$ aliyun ecs DeleteInstance --InstanceId xxx');
-    expect(result).toContain('请询问用户是否需要其他操作');
+    expect(result).toContain('Please ask the user if they need any other operations');
   });
 });

@@ -1,5 +1,5 @@
 /**
- * HITL 风控检测和审批轮询模块
+ * HITL Risk Detection and Approval Polling Module
  */
 
 import type { HitlCheckResult, PollResult, PendingAction, Logger, OpenClawPluginApi } from './types.js';
@@ -9,11 +9,11 @@ import { formatTimeoutMessage, formatApprovalSuccessMessage, formatApprovalRejec
 import { getActionStore } from './action-store.js';
 
 // ============================================================================
-// 风控检测
+// Risk Detection
 // ============================================================================
 
 /**
- * 调用风控 API 检测命令风险
+ * Call risk control API to detect command risk
  */
 export async function checkHitlRule(
   command: string,
@@ -24,7 +24,7 @@ export async function checkHitlRule(
   try {
     const cliVersion = await getCliVersion();
     
-    // 构建命令
+    // Build command
     const hitlCommand = [
       'aliyun ims CheckHitlRule',
       `--CliCommand "${command.replace(/"/g, '\\"')}"`,
@@ -38,7 +38,7 @@ export async function checkHitlRule(
     
     const result = await execCommand(hitlCommand);
     
-    // 解析 JSON 响应（API 使用 PascalCase 字段名）
+    // Parse JSON response (API uses PascalCase field names)
     interface ApiResponse {
       RequestId?: string;
       ExecutionDecision?: string;
@@ -60,15 +60,15 @@ export async function checkHitlRule(
       response = JSON.parse(result);
     } catch (parseErr) {
       logger.error('[hitl] HITL API JSON parse failed', { error: String(parseErr), result });
-      return { success: false, decision: 'ALLOW', error: 'JSON parse failed' };
+      return { success: false, decision: 'DENY', error: 'JSON parse failed' };
     }
     
     if (!response.ExecutionDecision) {
-      logger.warn('[hitl] HITL API returned no ExecutionDecision, allowing by default');
-      return { success: true, decision: 'ALLOW' };
+      logger.warn('[hitl] HITL API returned no ExecutionDecision, denying by default');
+      return { success: false, decision: 'DENY', error: 'No ExecutionDecision in response' };
     }
     
-    // 转换字段名（PascalCase -> camelCase）
+    // Convert field names (PascalCase -> camelCase)
     const decision = response.ExecutionDecision;
     const riskLevel = response.RiskLevel;
     const reason = response.Reason;
@@ -97,17 +97,17 @@ export async function checkHitlRule(
     };
   } catch (err) {
     logger.error('[hitl] HITL API call failed', { error: String(err), stack: err instanceof Error ? err.stack : undefined });
-    // 调用失败时默认放行（避免影响正常使用）
-    return { success: false, decision: 'ALLOW', error: String(err) };
+    // Deny by default on failure (fail-close security policy)
+    return { success: false, decision: 'DENY', error: String(err) };
   }
 }
 
 // ============================================================================
-// 审批轮询
+// Approval Polling
 // ============================================================================
 
 /**
- * 轮询响应结构
+ * Poll response structure
  */
 interface PollApiResponse {
   requestId?: string;
@@ -117,12 +117,12 @@ interface PollApiResponse {
   httpStatusCode?: string;
   data?: {
     status?: string;
-    token?: string;  // 服务端返回的字段名是 token，不是 hitlToken
+    token?: string;  // Server returns 'token', not 'hitlToken'
   };
 }
 
 /**
- * 获取审批状态
+ * Fetch approval status
  */
 export async function fetchApprovalStatus(
   pollingUrl: string,
@@ -158,22 +158,22 @@ export async function fetchApprovalStatus(
     const status = result.data?.status?.toUpperCase();
     const hitlToken = result.data?.token;
     
-    // 成功状态：继续执行
+    // Success status: proceed with execution
     if (status === 'CONFIRMED' || status === 'SUCCESS') {
       return { status: 'success', hitlToken };
     }
     
-    // 明确的失败状态：返回失败
+    // Explicit failure status: return failed
     if (status === 'REJECTED' || status === 'FAILED' || status === 'TIMEOUT' || status === 'EXPIRED' || status === 'CANCELLED') {
       return { status: 'failed' };
     }
     
-    // PENDING 状态：正常轮询
+    // PENDING status: continue polling
     if (status === 'PENDING') {
       return { status: 'pending' };
     }
     
-    // 其他未知状态：10s 后继续轮询
+    // Unknown status: retry in 10s
     logger.warn('[hitl] Unknown poll status, will retry in 10s', { status });
     return { status: 'unknown', delayMs: 10000 };
   } catch (err) {
@@ -183,7 +183,7 @@ export async function fetchApprovalStatus(
 }
 
 /**
- * 校验 HITL Token
+ * Validate HITL Token
  */
 export async function validateHitlToken(
   hitlToken: string,
@@ -224,18 +224,18 @@ export async function validateHitlToken(
   }
 }
 
-/** 存储正在轮询的 action ID */
+/** Store action IDs currently being polled */
 const pollingActions = new Set<string>();
 
 /**
- * 清理轮询状态（插件卸载时调用）
+ * Clear polling state (called when plugin is unloaded)
  */
 export function clearPollingActions(): void {
   pollingActions.clear();
 }
 
 /**
- * 启动后台轮询
+ * Start background polling
  */
 export function startPolling(
   action: PendingAction,
@@ -257,7 +257,7 @@ export function startPolling(
   
   const { authReqId, pollingUrl, approvalTimeout } = action.hitl;
   const sessionId = action.sessionKey || '';
-  const pollIntervalMs = 3000; // 3 秒轮询一次
+  const pollIntervalMs = 3000; // Poll every 3 seconds
   const timeoutMs = approvalTimeout * 1000;
   const startTime = Date.now();
   let pollCount = 0;
@@ -273,7 +273,7 @@ export function startPolling(
     pollCount++;
     const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
     
-    // 检查是否超时
+    // Check for timeout
     if (Date.now() - startTime > timeoutMs) {
       api.logger.warn('[hitl] Approval timeout', { actionId: action.id, pollCount, elapsedSeconds });
       pollingActions.delete(action.id);
@@ -286,7 +286,7 @@ export function startPolling(
       return;
     }
     
-    // 检查 action 是否还存在（可能被用户手动取消）
+    // Check if action still exists (may have been manually cancelled)
     if (!store.get(action.id)) {
       api.logger.info('[hitl] Action cancelled, stopping poll', { actionId: action.id });
       pollingActions.delete(action.id);
@@ -299,7 +299,7 @@ export function startPolling(
       api.logger.info('[hitl] Poll status changed', { actionId: action.id, status: pollResult.status, pollCount });
     }
     
-    // pending 或 unknown 状态：继续轮询
+    // pending or unknown status: continue polling
     if (pollResult.status === 'pending' || pollResult.status === 'unknown') {
       const nextDelay = pollResult.delayMs || pollIntervalMs;
       setTimeout(poll, nextDelay);
@@ -309,13 +309,13 @@ export function startPolling(
     pollingActions.delete(action.id);
     
     if (pollResult.status === 'success') {
-      // 校验 HITL Token
+      // Validate HITL Token
       const hitlToken = pollResult.hitlToken;
       if (!hitlToken) {
         api.logger.error('[hitl] Approval success but no hitlToken returned', { actionId: action.id });
         store.delete(action.id);
         if (action.sessionKey) {
-          const agentMessage = formatTokenValidationFailedMessage(action.command, '服务端未返回校验令牌');
+          const agentMessage = formatTokenValidationFailedMessage(action.command, 'Server did not return validation token');
           await dispatchToAgent(action.sessionKey, agentMessage, api);
         }
         return;
@@ -327,13 +327,13 @@ export function startPolling(
         api.logger.warn('[hitl] Token validation failed', { actionId: action.id });
         store.delete(action.id);
         if (action.sessionKey) {
-          const agentMessage = formatTokenValidationFailedMessage(action.command, '令牌校验失败');
+          const agentMessage = formatTokenValidationFailedMessage(action.command, 'Token validation failed');
           await dispatchToAgent(action.sessionKey, agentMessage, api);
         }
         return;
       }
       
-      // Token 校验通过，执行命令
+      // Token validated, execute command
       const result = await execCommand(action.command);
       api.logger.info('[hitl] Token validated and command executed', { actionId: action.id, resultLength: result.length });
       store.delete(action.id);
