@@ -1,6 +1,6 @@
 {
   "name": "@alicloud/alibabacloud-agent-hitl",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Monorepo for OpenClaw plugins",
   "private": true,
   "scripts": {

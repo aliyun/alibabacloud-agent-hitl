@@ -1,7 +1,7 @@
 {
   "id": "alibabacloud-hitl-claw-plugin",
   "name": "阿里云 HITL 拦截器",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "拦截阿里云 CLI 敏感操作，通过 HITL（Human-in-the-Loop）风控审批后执行",
   "author": "Alibaba Cloud",
   "entry": "./dist/index.js",

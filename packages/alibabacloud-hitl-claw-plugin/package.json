@@ -1,6 +1,6 @@
 {
   "name": "@alicloud/alibabacloud-hitl-claw-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "description": "OpenClaw plugin for intercepting tool calls with user confirmation",
   "main": "dist/index.js",
@@ -13,6 +13,7 @@
   "scripts": {
     "prebuild": "node -e \"const pkg=require('./package.json');const plugin=require('./openclaw.plugin.json');plugin.version=pkg.version;require('fs').writeFileSync('./openclaw.plugin.json',JSON.stringify(plugin,null,2))\"",
     "build": "rm -f tsconfig.tsbuildinfo && tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest"
