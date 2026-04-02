@@ -15,12 +15,14 @@ import type {
   PluginHookBeforeToolCallEvent,
   PluginHookToolContext,
   PluginHookBeforeToolCallResult,
+  PluginHookMessageReceivedEvent,
+  PluginHookMessageContext,
 } from './types.js';
 import { getActionStore, destroyActionStore } from './action-store.js';
 import { loadConfig } from './config.js';
 import { extractCommandString, extractAliyunCommands, joinAliyunCommands } from './rules.js';
 import { checkHitlRule, startPolling, clearPollingActions } from './hitl.js';
-import { isMainChannel, isDingtalkChannel } from './channel.js';
+import { isMainChannel, isDingtalkChannel, cacheOriginalTarget, clearOriginalTargetCache } from './channel.js';
 
 // ============================================================================
 // Plugin Entry
@@ -37,6 +39,25 @@ export default function register(api: OpenClawPluginApi): void {
   api.logger.info('[hitl] Plugin loaded');
 
   const store = getActionStore();
+
+  // -------------------------------------------------------------------------
+  // Register message_received hook (cache original conversationId)
+  // -------------------------------------------------------------------------
+  api.on(
+    'message_received',
+    (
+      _event: PluginHookMessageReceivedEvent,
+      ctx: PluginHookMessageContext,
+    ): void => {
+      // Cache original conversationId (preserving case) for later use when routing back
+      // This is needed because sessionKey converts target to lowercase, but DingTalk API needs original case
+      if (ctx.channelId && ctx.conversationId) {
+        const lowercaseKey = `${ctx.channelId}:${ctx.conversationId.toLowerCase()}`;
+        cacheOriginalTarget(lowercaseKey, ctx.conversationId);
+      }
+    },
+    { name: 'alibaba-cloud-hitl-message-received' },
+  );
 
   // -------------------------------------------------------------------------
   // Register before_tool_call hook (core interception logic)
@@ -77,9 +98,20 @@ export default function register(api: OpenClawPluginApi): void {
         return;
       }
 
-      // DENY: reject
+      // DENY: reject (could be API failure or actual risk control denial)
       if (hitlResult.decision === 'DENY') {
         const isComposite = aliyunCommandStr !== command;
+        
+        // Check if this is an API failure (fail-close policy)
+        if (!hitlResult.success) {
+          api.logger.warn(`[hitl] API failure: ${hitlResult.error?.slice(0, 200)}`);
+          return {
+            block: true,
+            blockReason: hitlResult.error || 'Risk control API call failed',
+          };
+        }
+        
+        // Normal risk control denial
         return {
           block: true,
           blockReason: [
@@ -217,4 +249,5 @@ export default function register(api: OpenClawPluginApi): void {
 export function unregister(): void {
   clearPollingActions();
   destroyActionStore();
+  clearOriginalTargetCache();
 }

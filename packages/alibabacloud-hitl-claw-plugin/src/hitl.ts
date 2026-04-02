@@ -59,13 +59,14 @@ export async function checkHitlRule(
     try {
       response = JSON.parse(result);
     } catch (parseErr) {
-      logger.error('[hitl] HITL API JSON parse failed', { error: String(parseErr), result });
-      return { success: false, decision: 'DENY', error: 'JSON parse failed' };
+      // JSON parse failed - likely command execution error, return the raw output
+      logger.error('[hitl] HITL API response parse failed', { result });
+      return { success: false, decision: 'DENY', error: result };
     }
     
     if (!response.ExecutionDecision) {
-      logger.warn('[hitl] HITL API returned no ExecutionDecision, denying by default');
-      return { success: false, decision: 'DENY', error: 'No ExecutionDecision in response' };
+      logger.warn('[hitl] HITL API returned no ExecutionDecision', { response });
+      return { success: false, decision: 'DENY', error: `No ExecutionDecision in response: ${JSON.stringify(response)}` };
     }
     
     // Convert field names (PascalCase -> camelCase)

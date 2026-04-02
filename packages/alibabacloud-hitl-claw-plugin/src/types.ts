@@ -97,6 +97,15 @@ export interface PluginHookToolContext {
   runId?: string;
   toolName: string;
   toolCallId?: string;
+  // Extended context fields (may be available at runtime)
+  OriginatingTo?: string;
+  OriginatingChannel?: string;
+  Provider?: string;
+  Surface?: string;
+  ChatType?: string;
+  AccountId?: string;
+  // Allow accessing any additional fields
+  [key: string]: unknown;
 }
 
 export interface PluginHookBeforeToolCallResult {
@@ -116,6 +125,15 @@ export interface PluginHookMessageContext {
   channelId: string;
   accountId?: string;
   conversationId?: string;
+  // Extended context fields (may be available at runtime)
+  sessionKey?: string;
+  OriginatingTo?: string;
+  OriginatingChannel?: string;
+  Provider?: string;
+  Surface?: string;
+  ChatType?: string;
+  // Allow accessing any additional fields
+  [key: string]: unknown;
 }
 
 export interface Logger {

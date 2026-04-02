@@ -3,11 +3,14 @@
  * Tests for channel parsing functionality
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest';
 import {
   isMainChannel,
   isDingtalkChannel,
   parseChannelFromSessionKey,
+  cacheOriginalTarget,
+  getOriginalTarget,
+  clearOriginalTargetCache,
 } from '../src/channel.js';
 
 describe('isMainChannel', () => {
@@ -157,5 +160,72 @@ describe('parseChannelFromSessionKey', () => {
         rawChannelName: 'dingtalk-connector',
       });
     });
+  });
+});
+
+describe('originalTarget cache', () => {
+  beforeEach(() => {
+    clearOriginalTargetCache();
+  });
+
+  it('caches original target and retrieves it', () => {
+    // Simulate: DingTalk sends original case 'cid9Ny3fB+D+1LkSf2Sn7GjEq=='
+    // but sessionKey has lowercase 'cid9ny3fb+d+1lksf2sn7gjeq=='
+    const channelId = 'dingtalk-connector';
+    const originalConversationId = 'cid9Ny3fB+D+1LkSf2Sn7GjEq==';
+    const lowercaseKey = `${channelId}:${originalConversationId.toLowerCase()}`;
+    
+    cacheOriginalTarget(lowercaseKey, originalConversationId);
+    
+    // When we parse sessionKey, we get lowercase target
+    const sessionKey = 'agent:main:dingtalk-connector:group:cid9ny3fb+d+1lksf2sn7gjeq==';
+    const channelInfo = parseChannelFromSessionKey(sessionKey);
+    const retrieved = getOriginalTarget(channelInfo);
+    
+    expect(retrieved).toBe(originalConversationId);
+  });
+
+  it('returns sessionKey target when no cache exists', () => {
+    const sessionKey = 'agent:main:dingtalk-connector:group:cid123';
+    
+    const channelInfo = parseChannelFromSessionKey(sessionKey);
+    const retrieved = getOriginalTarget(channelInfo);
+    
+    expect(retrieved).toBe('cid123');
+  });
+
+  it('handles empty inputs gracefully', () => {
+    cacheOriginalTarget('', '');
+    
+    const channelInfo = parseChannelFromSessionKey('agent:main:main');
+    const retrieved = getOriginalTarget(channelInfo);
+    
+    expect(retrieved).toBe('');
+  });
+
+  it('clears cache properly', () => {
+    const channelId = 'dingtalk-connector';
+    const cacheKey = `${channelId}:cid123`;
+    cacheOriginalTarget(cacheKey, 'CID123Original');
+    
+    clearOriginalTargetCache();
+    
+    const sessionKey = 'agent:main:dingtalk-connector:group:cid123';
+    const channelInfo = parseChannelFromSessionKey(sessionKey);
+    const retrieved = getOriginalTarget(channelInfo);
+    
+    // Should fall back to sessionKey target
+    expect(retrieved).toBe('cid123');
+  });
+
+  it('handles multiple channels independently', () => {
+    cacheOriginalTarget('dingtalk-connector:cid1', 'CID1Original');
+    cacheOriginalTarget('dingtalk-connector:cid2', 'CID2Original');
+    
+    const channelInfo1 = parseChannelFromSessionKey('agent:main:dingtalk-connector:group:cid1');
+    const channelInfo2 = parseChannelFromSessionKey('agent:main:dingtalk-connector:group:cid2');
+    
+    expect(getOriginalTarget(channelInfo1)).toBe('CID1Original');
+    expect(getOriginalTarget(channelInfo2)).toBe('CID2Original');
   });
 });

@@ -5,6 +5,44 @@
 import type { ChannelInfo, OpenClawPluginApi } from './types.js';
 
 // ============================================================================
+// Original ConversationId Cache
+// ============================================================================
+
+// Cache to store original conversationId (preserving case) keyed by "channelId:lowercaseConversationId"
+// This is needed because sessionKey converts the target to lowercase, but DingTalk API needs original case
+const originalTargetCache = new Map<string, string>();
+
+/**
+ * Cache the original conversationId
+ * @param cacheKey - Format: "channelId:lowercaseConversationId"
+ * @param originalConversationId - Original conversationId with correct case
+ */
+export function cacheOriginalTarget(cacheKey: string, originalConversationId: string): void {
+  if (!cacheKey || !originalConversationId) return;
+  originalTargetCache.set(cacheKey, originalConversationId);
+}
+
+/**
+ * Get the cached original conversationId, or fall back to the sessionKey target
+ */
+export function getOriginalTarget(channelInfo: ChannelInfo): string {
+  if (!channelInfo.rawChannelName || !channelInfo.target) {
+    return channelInfo.target;
+  }
+  
+  // Build cache key: channelId (rawChannelName) + lowercase target
+  const cacheKey = `${channelInfo.rawChannelName}:${channelInfo.target.toLowerCase()}`;
+  return originalTargetCache.get(cacheKey) || channelInfo.target;
+}
+
+/**
+ * Clear all cached targets (for cleanup)
+ */
+export function clearOriginalTargetCache(): void {
+  originalTargetCache.clear();
+}
+
+// ============================================================================
 // Channel Parsing
 // ============================================================================
 
@@ -130,19 +168,8 @@ async function dispatchToAgentInternal(
 ): Promise<void> {
   const channelInfo = parseChannelFromSessionKey(sessionKey);
   
-  api.logger.info(`[hitl] ========== dispatchToAgentInternal START ==========`);
-  api.logger.info(`[hitl] sessionKey: ${sessionKey}`);
-  api.logger.info(`[hitl] sessionKey length: ${sessionKey.length}`);
-  api.logger.info(`[hitl] channelInfo: ${JSON.stringify(channelInfo, null, 2)}`);
-  
-  // Debug: Check for special characters in target
-  if (channelInfo.target) {
-    const hasPlus = channelInfo.target.includes('+');
-    const hasEquals = channelInfo.target.includes('=');
-    const hasSlash = channelInfo.target.includes('/');
-    api.logger.info(`[hitl] target special chars: hasPlus=${hasPlus}, hasEquals=${hasEquals}, hasSlash=${hasSlash}`);
-    api.logger.info(`[hitl] target raw bytes: ${Buffer.from(channelInfo.target).toString('hex')}`);
-  }
+  // Get original target (with correct case) from cache, or fall back to sessionKey target
+  const originalTarget = getOriginalTarget(channelInfo);
 
   try {
     // Build context with different routing params based on channel type
@@ -157,19 +184,19 @@ async function dispatchToAgentInternal(
     };
 
     // Set routing params: route back to the original channel
-    if (channelInfo.rawChannelName && channelInfo.target) {
+    if (channelInfo.rawChannelName && originalTarget) {
       // External channel: use webchat as Provider/Surface, route via OriginatingChannel/OriginatingTo
       ctxParams.Provider = 'webchat';
       ctxParams.Surface = 'webchat';
       ctxParams.ExplicitDeliverRoute = true;
       ctxParams.OriginatingChannel = channelInfo.rawChannelName;
-      ctxParams.OriginatingTo = channelInfo.target;
+      ctxParams.OriginatingTo = originalTarget;  // Use original target with correct case
       if (channelInfo.accountId) {
         ctxParams.AccountId = channelInfo.accountId;
       }
       ctxParams.ChatType = channelInfo.type === 'group' ? 'group' : 'direct';
       
-      api.logger.info(`[hitl] Routing back to ${channelInfo.rawChannelName}: target=${channelInfo.target}`);
+      api.logger.info(`[hitl] Routing to ${channelInfo.rawChannelName}:${originalTarget} (${channelInfo.type})`);
     } else {
       // Main channel or unknown: use webchat
       ctxParams.Provider = 'webchat';
@@ -177,44 +204,7 @@ async function dispatchToAgentInternal(
       api.logger.info(`[hitl] Routing to webchat (main channel)`);
     }
 
-    // Log full ctxParams before finalization
-    api.logger.info(`[hitl] ctxParams BEFORE finalize: ${JSON.stringify({
-      Provider: ctxParams.Provider,
-      Surface: ctxParams.Surface,
-      ExplicitDeliverRoute: ctxParams.ExplicitDeliverRoute,
-      OriginatingChannel: ctxParams.OriginatingChannel,
-      OriginatingTo: ctxParams.OriginatingTo,
-      AccountId: ctxParams.AccountId,
-      ChatType: ctxParams.ChatType,
-      SessionKey: ctxParams.SessionKey,
-    }, null, 2)}`);
-
     const ctx = api.runtime.channel.reply.finalizeInboundContext(ctxParams);
-    
-    // Log full ctx after finalization
-    api.logger.info(`[hitl] ctx AFTER finalize: ${JSON.stringify({
-      Provider: ctx.Provider,
-      Surface: ctx.Surface,
-      ExplicitDeliverRoute: ctx.ExplicitDeliverRoute,
-      OriginatingChannel: ctx.OriginatingChannel,
-      OriginatingTo: ctx.OriginatingTo,
-      AccountId: ctx.AccountId,
-      ChatType: ctx.ChatType,
-      SessionKey: ctx.SessionKey,
-    }, null, 2)}`);
-    
-    // Compare OriginatingTo before and after
-    const origToBeforeStr = String(ctxParams.OriginatingTo || '');
-    const origToAfterStr = String(ctx.OriginatingTo || '');
-    if (origToBeforeStr !== origToAfterStr) {
-      api.logger.warn(`[hitl] ⚠️ OriginatingTo CHANGED after finalize!`);
-      api.logger.warn(`[hitl]   BEFORE: "${origToBeforeStr}" (len=${origToBeforeStr.length})`);
-      api.logger.warn(`[hitl]   AFTER:  "${origToAfterStr}" (len=${origToAfterStr.length})`);
-      api.logger.warn(`[hitl]   BEFORE hex: ${Buffer.from(origToBeforeStr).toString('hex')}`);
-      api.logger.warn(`[hitl]   AFTER hex:  ${Buffer.from(origToAfterStr).toString('hex')}`);
-    } else {
-      api.logger.info(`[hitl] ✓ OriginatingTo unchanged after finalize: "${origToAfterStr}"`);
-    }
 
     const simpleDispatcher = {
       sendToolResult: () => true,
@@ -225,7 +215,6 @@ async function dispatchToAgentInternal(
       markComplete: () => {},
     };
 
-    api.logger.info(`[hitl] Calling dispatchReplyFromConfig...`);
     const result = await api.runtime.channel.reply.dispatchReplyFromConfig({
       ctx,
       cfg: api.config,
@@ -234,15 +223,17 @@ async function dispatchToAgentInternal(
         onCompactionStart: () => {},
       },
     });
-    api.logger.info(`[hitl] dispatchReplyFromConfig result: ${JSON.stringify(result, null, 2)}`);
 
     simpleDispatcher.markComplete();
     await simpleDispatcher.waitForIdle();
 
-    api.logger.info(`[hitl] ========== dispatchToAgentInternal END (success) ==========`);
+    if (result.queuedFinal) {
+      api.logger.info(`[hitl] Message dispatched successfully`);
+    } else {
+      api.logger.warn(`[hitl] Message dispatch: queuedFinal=${result.queuedFinal}`);
+    }
   } catch (err) {
-    api.logger.error(`[hitl] ========== dispatchToAgentInternal END (error) ==========`);
-    api.logger.error(`[hitl] Error: ${String(err)}`);
+    api.logger.error(`[hitl] Dispatch failed: ${String(err)}`);
     if (err instanceof Error) {
       api.logger.error(`[hitl] Stack: ${err.stack}`);
     }
