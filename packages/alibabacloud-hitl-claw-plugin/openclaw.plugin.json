@@ -1,7 +1,7 @@
 {
   "id": "alibabacloud-hitl-claw-plugin",
-  "name": "alibabacloud-hitl-claw-plugin",
-  "version": "0.0.3",
+  "name": "Alibabacloud-Hitl-Claw-Plugin",
+  "version": "0.0.4",
   "description": "Detect sensitive Alibaba Cloud CLI commands, requiring HITL (Human-in-the-Loop) approval before execution.",
   "author": "Alibaba Cloud",
   "entry": "./dist/index.js",
