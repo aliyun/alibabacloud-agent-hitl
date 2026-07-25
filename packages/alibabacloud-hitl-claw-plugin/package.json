@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "nanoid": "^5.1.7",
-    "shell-quote": "^1.8.3"
+    "shell-quote": "^1.9.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
